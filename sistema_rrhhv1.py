@@ -190,3 +190,193 @@ class Operativo(Empleado):
 
     def descripcion_tipo(self):
         return f"Operativo (turno {self.__turno}, {self.__horas_extra} horas extra)"
+
+# ---------------------------------------------------------------------------
+# Vacaciones y capacitaciones
+# ---------------------------------------------------------------------------
+class Vacacion:
+    def __init__(self, empleado, fecha_inicio, dias):
+        if dias <= 0:
+            raise ExcepcionPersonalizada("Los dias de vacaciones deben ser mayores a cero")
+        self.__empleado = empleado
+        self.__fecha_inicio = fecha_inicio
+        self.__dias = dias
+        self.__aprobada = False
+
+    @property
+    def empleado(self):
+        return self.__empleado
+
+    @property
+    def fecha_inicio(self):
+        return self.__fecha_inicio
+
+    @property
+    def dias(self):
+        return self.__dias
+
+    @property
+    def aprobada(self):
+        return self.__aprobada
+
+    def aprobar(self):
+        self.__aprobada = True
+
+    def __str__(self):
+        if self.aprobada:
+            texto = "Aprobada"
+        else:
+            texto = "Pendiente"
+        return f"Vacaciones desde {self.fecha_inicio} - {self.dias} dias - {texto}"
+
+class Capacitacion:
+    def __init__(self, empleado, nombre, fecha, horas):
+        if nombre == "":
+            raise ExcepcionPersonalizada("El nombre de la capacitacion no puede estar vacio")
+        if horas <= 0:
+            raise ExcepcionPersonalizada("Las horas deben ser mayores a cero")
+        self.__empleado = empleado
+        self.__nombre = nombre
+        self.__fecha = fecha
+        self.__horas = horas
+        self.__completada = False
+
+    @property
+    def empleado(self):
+        return self.__empleado
+
+    @property
+    def nombre(self):
+        return self.__nombre
+
+    @property
+    def completada(self):
+        return self.__completada
+
+    def completar(self):
+        self.__completada = True
+
+    def __str__(self):
+        if self.completada:
+            texto = "Completada"
+        else:
+            texto = "Pendiente"
+        return f"Capacitacion {self.__nombre} - {self.__fecha} - {self.__horas} horas - {texto}"
+
+# ---------------------------------------------------------------------------
+# Registros
+# ---------------------------------------------------------------------------
+class RegistroVacaciones:
+    def __init__(self):
+        self.__vacaciones = []
+
+    @property
+    def vacaciones(self):
+        return self.__vacaciones
+
+    def buscar_por_dni(self, dni):
+        encontradas = []
+        for v in self.__vacaciones:
+            if v.empleado.dni == dni:
+                encontradas.append(v)
+        return encontradas
+
+    def dias_aprobados(self, dni):
+        total = 0
+        for v in self.buscar_por_dni(dni):
+            if v.aprobada:
+                total = total + v.dias
+        return total
+
+    def dias_solicitados(self, dni):
+        total = 0
+        for v in self.buscar_por_dni(dni):
+            total = total + v.dias
+        return total
+
+    def solicitar(self, vacacion):
+        if self.dias_solicitados(vacacion.empleado.dni) + vacacion.dias > LIMITE_VACACIONES:
+            raise ExcepcionPersonalizada("Los dias superan el limite de vacaciones")
+        self.__vacaciones.append(vacacion)
+
+    def aprobar(self, vacacion):
+        if self.dias_aprobados(vacacion.empleado.dni) + vacacion.dias > LIMITE_VACACIONES:
+            raise ExcepcionPersonalizada("No se puede aprobar: supera el limite de vacaciones")
+        vacacion.aprobar()
+
+class RegistroCapacitaciones:
+    def __init__(self):
+        self.__capacitaciones = []
+
+    @property
+    def capacitaciones(self):
+        return self.__capacitaciones
+
+    def agregar(self, capacitacion):
+        self.__capacitaciones.append(capacitacion)
+
+    def buscar_por_dni(self, dni):
+        encontradas = []
+        for c in self.__capacitaciones:
+            if c.empleado.dni == dni:
+                encontradas.append(c)
+        return encontradas
+
+# ---------------------------------------------------------------------------
+# Sistema RRHH
+# ---------------------------------------------------------------------------
+class SistemaRRHH:
+    def __init__(self):
+        self.__empleados = []
+        self.__registro_vacaciones = RegistroVacaciones()
+        self.__registro_capacitaciones = RegistroCapacitaciones()
+        self.registrar_empleado(Operativo(
+            45678912, "Jesus Andres", "Lujan", "Operaciones", "15/03/2024", 3500, AFPS[0], "Noche", 10))
+        self.registrar_empleado(Administrativo(
+            73738625, "Ariel", "Zarate", "TI", "14/10/2022", 2500, AFPS[1], 150))
+        self.registrar_empleado(Administrativo(
+            47891234, "Vannesa", "Rios", "Finanzas", "10/01/2022", 9800, AFPS[2], 200))
+        self.registrar_empleado(Administrativo(
+            41234567, "Gianpiero", "Yataco", "Comercial", "01/06/2023", 5200, AFPS[1], 150))
+        self.registrar_empleado(Administrativo(
+            76543210, "Victor", "Balboa", "Recursos Humanos", "10/09/2025", 5200, AFPS[1], 150))
+
+    @property
+    def empleados(self):
+        return self.__empleados
+
+    @property
+    def vacaciones(self):
+        return self.__registro_vacaciones
+
+    @property
+    def capacitaciones(self):
+        return self.__registro_capacitaciones
+
+    def registrar_empleado(self, empleado):
+        for e in self.__empleados:
+            if e.dni == empleado.dni:
+                raise ExcepcionPersonalizada("Ya existe un colaborador con ese DNI")
+        self.__empleados.append(empleado)
+
+    def buscar_por_dni(self, dni):
+        for e in self.__empleados:
+            if e.dni == dni:
+                return e
+        raise ExcepcionPersonalizada(f"El colaborador con DNI {dni} no existe")
+
+    def buscar_por_nombre(self, texto):
+        encontrados = []
+        for e in self.__empleados:
+            if e.nombres == texto or e.apellidos == texto:
+                encontrados.append(e)
+        return encontrados
+
+    def buscar_por_area(self, area):
+        encontrados = []
+        for e in self.__empleados:
+            if e.area == area:
+                encontrados.append(e)
+        return encontrados
+
+
