@@ -379,4 +379,166 @@ class SistemaRRHH:
                 encontrados.append(e)
         return encontrados
 
+# ---------------------------------------------------------------------------
+# Boleta y planilla
+# ---------------------------------------------------------------------------
+class BoletaPago:
+    def __init__(self, empleado):
+        self.__empleado = empleado
+        # Polimorfismo: cada tipo de empleado calcula su ingreso de forma distinta
+        self.__descuento_faltas = empleado.calcular_descuento_faltas()
+        self.__ingreso = empleado.calcular_ingreso_total() - self.__descuento_faltas
+        self.__descuento_afp = empleado.afp.calcular_descuento(self.__ingreso)
+        self.__impuesto = self.calcular_renta(self.__ingreso)
+        self.__neto = self.__ingreso - self.__descuento_afp - self.__impuesto
+
+    @property
+    def empleado(self):
+        return self.__empleado
+
+    @property
+    def descuento_faltas(self):
+        return self.__descuento_faltas
+
+    @property
+    def ingreso(self):
+        return self.__ingreso
+
+    @property
+    def descuento_afp(self):
+        return self.__descuento_afp
+
+    @property
+    def impuesto(self):
+        return self.__impuesto
+
+    @property
+    def neto(self):
+        return self.__neto
+
+    def calcular_renta(self, ingreso_mensual):
+        base = ingreso_mensual * 14 - 7 * UIT
+        if base <= 0:
+            impuesto = 0
+        elif base <= 5 * UIT:
+            impuesto = base * 0.08
+        elif base <= 20 * UIT:
+            impuesto = 5 * UIT * 0.08 + (base - 5 * UIT) * 0.14
+        elif base <= 35 * UIT:
+            impuesto = 5 * UIT * 0.08 + 15 * UIT * 0.14 + (base - 20 * UIT) * 0.17
+        elif base <= 45 * UIT:
+            impuesto = 5 * UIT * 0.08 + 15 * UIT * 0.14 + 15 * UIT * 0.17 + (base - 35 * UIT) * 0.20
+        else:
+            impuesto = (5 * UIT * 0.08 + 15 * UIT * 0.14 + 15 * UIT * 0.17
+                        + 10 * UIT * 0.20 + (base - 45 * UIT) * 0.30)
+        return impuesto / 12
+
+    def __str__(self):
+        return f"{self.empleado.nombres} {self.empleado.apellidos} - Neto: S/. {self.neto:.2f}"
+
+
+class Planilla:
+    def __init__(self, mes, anio):
+        self.__mes = mes
+        self.__anio = anio
+        self.__boletas = []
+
+    @property
+    def mes(self):
+        return self.__mes
+
+    @property
+    def anio(self):
+        return self.__anio
+
+    @property
+    def boletas(self):
+        return self.__boletas
+
+    def generar(self, empleados):
+        self.__boletas = []
+        for e in empleados:
+            if e.activo:
+                self.__boletas.append(BoletaPago(e))
+
+    def total_a_pagar(self):
+        total = 0
+        for b in self.__boletas:
+            total = total + b.neto
+        return total
+
+
+# ---------------------------------------------------------------------------
+# Funciones para comprobar los datos del input
+# ---------------------------------------------------------------------------
+def pedir_entero(mensaje):
+    try:
+        return int(input(mensaje + ": "))
+    except ValueError:
+        raise ExcepcionPersonalizada("Debe ingresar un numero entero")
+
+
+def pedir_decimal(mensaje):
+    try:
+        return float(input(mensaje + ": "))
+    except ValueError:
+        raise ExcepcionPersonalizada("Debe ingresar un numero")
+
+
+def elegir_afp():
+    print("AFP:")
+    numero = 1
+    for a in AFPS:
+        print(f"  [{numero}] {a}")
+        numero = numero + 1
+    opcion = pedir_entero("Seleccione una AFP")
+    if opcion < 1 or opcion > 4:
+        raise ExcepcionPersonalizada("La AFP seleccionada no existe")
+    return AFPS[opcion - 1]
+
+
+def elegir_area():
+    print("Area:")
+    numero = 1
+    for a in AREAS:
+        print(f"  [{numero}] {a}")
+        numero = numero + 1
+    opcion = pedir_entero("Seleccione un area")
+    if opcion < 1 or opcion > 5:
+        raise ExcepcionPersonalizada("El area seleccionada no existe")
+    return AREAS[opcion - 1]
+
+
+def mostrar_empleado(e):
+    print(LINEA_LARGA)
+    print("DNI:           ", e.dni)
+    print("Nombre:        ", e.nombres, e.apellidos)
+    print("Tipo:          ", e.descripcion_tipo())
+    print("Area:          ", e.area)
+    print("Fecha ingreso: ", e.fecha_ingreso)
+    print("Faltas del mes:", e.faltas)
+    if e.activo:
+        print("Estado:         Activo")
+    else:
+        print("Estado:         Cesado")
+        print("Fecha de cese: ", e.fecha_cese)
+    print(f"Sueldo bruto:   S/. {e.sueldo_bruto:.2f}")
+    print("AFP:           ", e.afp)
+    print(LINEA_LARGA)
+
+
+def mostrar_historial(sistema, e):
+    print(LINEA_LARGA)
+    print(f"HISTORIAL DE {e.nombres} {e.apellidos}")
+    print(f"Vacaciones aprobadas: {sistema.vacaciones.dias_aprobados(e.dni)} de {LIMITE_VACACIONES} dias")
+    hay_registros = False
+    for v in sistema.vacaciones.buscar_por_dni(e.dni):
+        print("  ", v)
+        hay_registros = True
+    for c in sistema.capacitaciones.buscar_por_dni(e.dni):
+        print("  ", c)
+        hay_registros = True
+    if not hay_registros:
+        print("  Sin registros")
+    print(LINEA_LARGA)
 
