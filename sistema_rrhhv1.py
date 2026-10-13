@@ -541,3 +541,257 @@ def mostrar_historial(sistema, e):
     if not hay_registros:
         print("  Sin registros")
     print(LINEA_LARGA)
+
+
+# ---------------------------------------------------------------------------
+# Pantallas
+# ---------------------------------------------------------------------------
+def pantalla_registrar(sistema):
+    print(LINEA_LARGA)
+    print("REGISTRO DE NUEVO COLABORADOR")
+    print(LINEA_LARGA)
+    print("[1] Administrativo")
+    print("[2] Operativo")
+    print("[0] Cancelar")
+    tipo = input("Seleccione una opcion: ")
+    if tipo != "1" and tipo != "2":
+        return
+    try:
+        dni = pedir_entero("DNI")
+        nombres = input("Nombres: ")
+        apellidos = input("Apellidos: ")
+        area = elegir_area()
+        fecha = input("Fecha de ingreso (dd/mm/aaaa): ")
+        sueldo = pedir_decimal("Sueldo bruto S/.")
+        afp = elegir_afp()
+        if tipo == "1":
+            bono = pedir_decimal("Bono de movilidad S/.")
+            empleado = Administrativo(dni, nombres, apellidos, area, fecha, sueldo, afp, bono)
+        else:
+            turno = input("Turno (Mañana/Tarde/Noche): ")
+            horas = pedir_entero("Horas extra del mes")
+            empleado = Operativo(dni, nombres, apellidos, area, fecha, sueldo, afp,
+                                turno, horas)
+        print("Validando datos...")
+        sistema.registrar_empleado(empleado)
+    except ExcepcionPersonalizada as e:
+        print("ERROR:", e)
+    else:
+        print("Correcto: colaborador registrado con exito")
+    finally:
+        print("Fin de la operacion")
+
+
+def pantalla_buscar(sistema):
+    print(LINEA_LARGA)
+    print("BUSCAR COLABORADOR")
+    print(LINEA_LARGA)
+    print("[1] Por DNI")
+    print("[2] Por nombre")
+    print("[3] Por area")
+    print("[0] Volver")
+    opcion = input("Seleccione una opcion: ")
+    try:
+        if opcion == "1":
+            resultados = [sistema.buscar_por_dni(pedir_entero("Ingrese DNI"))]
+        elif opcion == "2":
+            resultados = sistema.buscar_por_nombre(input("Ingrese nombre o apellido: "))
+        elif opcion == "3":
+            resultados = sistema.buscar_por_area(elegir_area())
+        elif opcion == "0":
+            return
+        else:
+            raise ExcepcionPersonalizada("Opcion no valida")
+        if resultados == []:
+            print("No se encontraron resultados")
+            return
+        for e in resultados:
+            mostrar_empleado(e)
+        if opcion == "1":
+            pantalla_acciones(sistema, resultados[0])
+    except ExcepcionPersonalizada as e:
+        print("ERROR:", e)
+
+
+def pantalla_acciones(sistema, empleado):
+    print("[1] Cambiar area")
+    print("[2] Cambiar sueldo")
+    print("[3] Cambiar AFP")
+    print("[4] Ver historial (vacaciones y capacitaciones)")
+    print("[5] Registrar cese")
+    print("[6] Registrar faltas del mes")
+    print("[0] Volver")
+    opcion = input("Seleccione una opcion: ")
+    try:
+        if opcion == "1":
+            empleado.area = elegir_area()
+        elif opcion == "2":
+            empleado.sueldo_bruto = pedir_decimal("Nuevo sueldo bruto S/.")
+        elif opcion == "3":
+            empleado.afp = elegir_afp()
+        elif opcion == "4":
+            mostrar_historial(sistema, empleado)
+        elif opcion == "5":
+            empleado.registrar_cese(FECHA_ACTUAL)
+        elif opcion == "6":
+            empleado.faltas = pedir_entero("Dias de falta en el mes")
+        else:
+            return
+    except ExcepcionPersonalizada as e:
+        print("ERROR:", e)
+    else:
+        if opcion != "4":
+            print("Correcto: cambio realizado")
+    finally:
+        print("Fin de la operacion")
+
+
+def pantalla_listar(sistema):
+    print(LINEA_LARGA)
+    print("LISTADO DE COLABORADORES")
+    print(LINEA_LARGA)
+    print("[1] Todos")
+    print("[2] Solo activos")
+    print("[3] Solo cesados")
+    opcion = input("Seleccione una opcion: ")
+    if opcion != "1" and opcion != "2" and opcion != "3":
+        return
+    numero = 1
+    activos = 0
+    cesados = 0
+    for e in sistema.empleados:
+        if opcion == "1" or (opcion == "2" and e.activo) \
+                or (opcion == "3" and not e.activo):
+            print(f"{numero}. {e}")
+            numero = numero + 1
+            if e.activo:
+                activos = activos + 1
+            else:
+                cesados = cesados + 1
+    print(f"Total: {activos + cesados} colaboradores ({activos} activos, {cesados} cesados)")
+
+
+def pantalla_planilla(sistema):
+    planilla = Planilla(MES_ACTUAL, ANIO_ACTUAL)
+    planilla.generar(sistema.empleados)
+    print(LINEA_LARGA)
+    print(f"PLANILLA {planilla.mes}/{planilla.anio}")
+    for b in planilla.boletas:
+        print(LINEA_LARGA)
+        print("Colaborador:         ", b.empleado.nombres, b.empleado.apellidos)
+        print("Tipo:                ", b.empleado.descripcion_tipo())
+        print(f"Faltas del mes:       {b.empleado.faltas} dias (- S/. {b.descuento_faltas:.2f})")
+        print(f"Ingreso del mes:      S/. {b.ingreso:.2f}")
+        print(f"Descuento AFP:        S/. {b.descuento_afp:.2f}")
+        print(f"Impuesto a la renta:  S/. {b.impuesto:.2f}")
+        print(f"SUELDO NETO:          S/. {b.neto:.2f}")
+    print(LINEA_LARGA)
+    print(f"TOTAL A PAGAR EN PLANILLA: S/. {planilla.total_a_pagar():.2f}")
+
+
+def pantalla_vacaciones(sistema):
+    print(LINEA_LARGA)
+    print("VACACIONES Y CAPACITACIONES")
+    print(LINEA_LARGA)
+    try:
+        empleado = sistema.buscar_por_dni(pedir_entero("DNI del colaborador"))
+        if not empleado.activo:
+            raise ExcepcionPersonalizada("El colaborador esta cesado")
+        print("Colaborador:", empleado.nombres, empleado.apellidos)
+        print("[1] Registrar vacaciones")
+        print("[2] Registrar capacitacion")
+        print("[3] Aprobar vacaciones pendientes")
+        print("[4] Completar capacitaciones pendientes")
+        print("[5] Ver historial")
+        print("[0] Volver")
+        opcion = input("Seleccione una opcion: ")
+        if opcion == "1":
+            inicio = input("Fecha de inicio (dd/mm/aaaa): ")
+            dias = pedir_entero("Cantidad de dias")
+            print("Validando disponibilidad...")
+            sistema.vacaciones.solicitar(Vacacion(empleado, inicio, dias))
+        elif opcion == "2":
+            nombre = input("Nombre de la capacitacion: ")
+            horas = pedir_entero("Horas")
+            sistema.capacitaciones.agregar(Capacitacion(empleado, nombre, FECHA_ACTUAL, horas))
+        elif opcion == "3":
+            for v in sistema.vacaciones.buscar_por_dni(empleado.dni):
+                if not v.aprobada:
+                    sistema.vacaciones.aprobar(v)
+        elif opcion == "4":
+            for c in sistema.capacitaciones.buscar_por_dni(empleado.dni):
+                if not c.completada:
+                    c.completar()
+        elif opcion == "5":
+            mostrar_historial(sistema, empleado)
+        else:
+            return
+    except ExcepcionPersonalizada as e:
+        print("ERROR:", e)
+    else:
+        print("Correcto: operacion finalizada")
+    finally:
+        print("Fin de la operacion")
+
+
+def pantalla_cese(sistema):
+    print(LINEA_LARGA)
+    print("GESTION DE CESE")
+    print(LINEA_LARGA)
+    try:
+        empleado = sistema.buscar_por_dni(pedir_entero("DNI del colaborador"))
+        empleado.registrar_cese(FECHA_ACTUAL)
+    except ExcepcionPersonalizada as e:
+        print("ERROR:", e)
+    else:
+        print("Correcto: cese registrado, los datos se conservan")
+    finally:
+        print("Fin de la operacion")
+
+
+# ---------------------------------------------------------------------------
+# Main(): Programa principal
+# ---------------------------------------------------------------------------
+def main():
+    sistema = SistemaRRHH()
+    print(LINEA_LARGA)
+    print("SISTEMA DE GESTION DE RR.HH. - Polytec Peru S.A.C.")
+    print(LINEA_LARGA)
+
+    opcion = ""
+    try:
+        while opcion != "0":
+            print()
+            print(LINEA_LARGA)
+            print("MENU PRINCIPAL")
+            print(LINEA_LARGA)
+            print("[1] Registrar nuevo colaborador")
+            print("[2] Buscar colaborador")
+            print("[3] Listar colaboradores")
+            print("[4] Calcular planilla mensual")
+            print("[5] Registrar vacaciones / capacitaciones")
+            print("[6] Gestionar cese de colaborador")
+            print("[0] Salir")
+            opcion = input("Seleccione una opcion: ")
+            if opcion == "1":
+                pantalla_registrar(sistema)
+            elif opcion == "2":
+                pantalla_buscar(sistema)
+            elif opcion == "3":
+                pantalla_listar(sistema)
+            elif opcion == "4":
+                pantalla_planilla(sistema)
+            elif opcion == "5":
+                pantalla_vacaciones(sistema)
+            elif opcion == "6":
+                pantalla_cese(sistema)
+            elif opcion != "0":
+                print("Opcion no valida")
+    except KeyboardInterrupt:
+        print()
+        print("Programa interrumpido con Ctrl+C")
+    finally:
+        print("Hasta pronto")
+
+
+main()
